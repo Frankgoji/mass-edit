@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
-#include <dirent.h>
+#include <exception>
+#include <iomanip>
 #include <iostream>
 #include <regex>
 #include <sstream>
@@ -11,6 +13,23 @@
 using namespace std;
 namespace fs = boost::filesystem;
 
+/* Used for indicating a range of numbers. The range is [l, u). (end-exclusive) */
+class Range {
+    public:
+        Range(int begin, int end);
+        Range(string s);
+        static bool IsRange(string s);
+        bool OutOfRange(int n);
+        int Next(int n);
+        int Span();     // upper - lower
+        int begin();
+        int end();
+        Range reverse();
+    private:
+        int start;
+        int last;
+};
+
 class BaseRenamer {
     public:
         /* Constructor */
@@ -19,10 +38,14 @@ class BaseRenamer {
         void dir_rename(string old, string n);
         /* Lists the items in the directory */
         vector<string> & listdir();
+        /* Normalize filename lengths */
+        void normalize(int numZeros);
         /* Filters the files by a regex pattern */
         vector<string> & filterfiles(regex pattern);
         /* Insert and shift the names in the list, simultaneously renaming the files */
-        void shiftnames(int origpos, int newpos);
+        void insert(Range origpositions, int newpos);
+        /* Adds certain range of names by a number */
+        void shiftnames(Range files, int add);
     protected:
         /* List of files */
         vector<string> files;

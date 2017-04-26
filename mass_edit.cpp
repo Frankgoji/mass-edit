@@ -2,7 +2,46 @@
 
 using namespace std;
 
-/* Constructor */
+/* Range class */
+Range::Range(int b, int e)
+    : start(b),
+      last(e)
+{}
+Range::Range(string s) {
+    if (IsRange(s)) {
+        stringstream sm(s);
+        sm >> start;
+        sm.get();
+        sm >> last;
+    } else {
+        throw logic_error("Not a valid string");
+    }
+}
+int Range::begin() { return start; }
+int Range::end() { return last; }
+bool Range::IsRange(string s) {
+    stringstream sm(s);
+    int first, last;
+    return (sm >> first) && (sm.get() == '-') && (sm >> last);
+}
+bool Range::OutOfRange(int n) {
+    return (start < last && (n >= last || n < start))
+        || (start > last && (n <= last || n > start));
+}
+int Range::Next(int n) {
+    if (start <= last) {
+        return n+1;
+    }
+    return n-1;
+}
+int Range::Span() {
+    return abs(last - start);
+}
+Range Range::reverse() {
+    return Range(last-1, start-1);
+}
+
+/* BaseRenamer: Constructor */
 BaseRenamer::BaseRenamer()
     : files(0)
 {
@@ -30,6 +69,16 @@ vector<string> & BaseRenamer::listdir() {
     return files;
 }
 
+/* Normalize filename lengths up to numZeros */
+void BaseRenamer::normalize(int numZeros) {
+    for (size_t i = 0; i < files.size(); i++) {
+        stringstream name;
+        name << setfill('0') << setw(numZeros) << files[i];
+        dir_rename(files[i], name.str());
+    }
+    listdir();
+}
+
 /* Filters the files by a regex pattern */
 vector<string> & BaseRenamer::filterfiles(regex pattern) {
     vector<string>::iterator b = files.begin();
@@ -44,25 +93,66 @@ vector<string> & BaseRenamer::filterfiles(regex pattern) {
 }
 
 /* Insert and shift the names in the list, simultaneously renaming the files.
- * The item at origpos will be moved to newpos and everything else will be
- * shifted over.
+ * The item(s) at origpositions will be moved to newpos and everything else will
+ * be shifted over.
  * Precondition: files has been populated by listdir. */
-void BaseRenamer::shiftnames(int origpos, int newpos) {
-    // Rename origpos file to temp
-    dir_rename(files[origpos], "temp");
-    if (origpos < newpos) {
-        for (int i = origpos; i < newpos; i++) {
-            // Rename files[i+1] to files[i]
-            dir_rename(files[i+1], files[i]);
+void BaseRenamer::insert(Range origpositions, int newpos) {
+    if (!origpositions.OutOfRange(newpos)) {
+        cerr << "Cannot insert within a range." << endl;
+        return;
+    }
+    // Rename files in origpositions to temps
+    for (int i = origpositions.begin(); !origpositions.OutOfRange(i); i = origpositions.Next(i)) {
+        dir_rename(files[i], "temp" + to_string(i));
+    }
+    int offset;
+    if (origpositions.end() <= newpos) {
+        offset = newpos - origpositions.end() + 1;
+        for (int i = origpositions.end(); i <= newpos; i++) {
+            // Rename files[i+span] to files[i]
+            dir_rename(files[i], files[i-origpositions.Span()]);
         }
     } else {
-        for (int i = origpos; i > newpos; i--) {
-            // Rename files[i-1] to files[i]
-            dir_rename(files[i-1], files[i]);
+        offset = newpos - origpositions.begin();
+        for (int i = origpositions.begin()-1; i >= newpos; i--) {
+            // Rename files[i-span] to files[i]
+            dir_rename(files[i], files[i+origpositions.Span()]);
         }
     }
-    // Rename origpos file to newpos
-    dir_rename("temp", files[newpos]);
+    // Rename temp files to newpos
+    for (int i = origpositions.begin(); !origpositions.OutOfRange(i); i = origpositions.Next(i)) {
+        dir_rename("temp" + to_string(i), files[i + offset]);
+    }
+}
+
+/* Adds certain range of names by a number.
+ * Precondition: the range and the amount to add don't break filenames. */
+void BaseRenamer::shiftnames(Range fileRange, int add) {
+    size_t longestName = 0;
+    for (int i = fileRange.begin(); !fileRange.OutOfRange(i); i = fileRange.Next(i)) {
+        int fileNum;
+        stringstream strm(files[i]);
+        size_t suffixstart = files[i].find_last_of(".");
+        if (strm >> fileNum) {
+            strm.clear();
+            fileNum += add;
+            strm << fileNum;
+            string suffix = "";
+            if (suffixstart != string::npos) {
+                suffix = files[i].substr(suffixstart);
+                strm << suffix;
+            }
+            if (strm.str().length() > longestName) {
+                longestName = strm.str().length();
+            }
+            dir_rename(files[i], strm.str());
+        } else {
+            cerr << "File doesn't start with number." << endl;
+            break;
+        }
+    }
+    listdir();
+    normalize(longestName);
 }
 
 /* Constructor */
@@ -124,7 +214,7 @@ void CLIRenamer::InterpretList(stringstream & line) {
 void CLIRenamer::InterpretSwitch(stringstream & line) {
     int old, n;
     line >> old >> n;
-    shiftnames(old, n);
+    //insert(old, n);
 }
 
 /* Quit */
