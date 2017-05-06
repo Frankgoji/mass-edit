@@ -175,7 +175,7 @@ void CLIRenamer::InterpretCommands() {
             } else if (first == "ls") {
                 InterpretList(linestrm);
             } else if (first == "switch") {
-                InterpretSwitch(linestrm);
+                InterpretInsert(linestrm);
             } else if (first == "quit") {
                 InterpretQuit();
             } else {
@@ -210,8 +210,13 @@ void CLIRenamer::InterpretList(stringstream & line) {
     }
 }
 
-/* Interpret the switch command */
-void CLIRenamer::InterpretSwitch(stringstream & line) {
+/* Interpret the shift command */
+void InterpretShift(stringstream & line) {
+    //
+}
+
+/* Interpret the insert command */
+void CLIRenamer::InterpretInsert(stringstream & line) {
     int old, n;
     line >> old >> n;
     //insert(old, n);
@@ -225,9 +230,10 @@ void CLIRenamer::InterpretQuit() {
 /* Usage */
 void CLIRenamer::InterpretHelp() {
     cout << "Usage:" << endl;
-    cout << "cd <directory>\t\t\tchange directory" << endl;
-    cout << "ls\t\t\t\tlist directory contents with indices" << endl;
-    cout << "switch <index1> <index2>\tswitch items 1 and 2, appropriately shifting the other items" << endl;
+    cout << left << setw(30) << "cd <directory>" << setw(40) << "change directory" << endl;
+    cout << left << setw(30) << "ls" << setw(40) << "list directory contents with indices" << endl;
+    cout << left << setw(30) << "shift <all|range> <amount>" << setw(40) << "shift file numbers by some amount. shift <amt> defaults to all" << endl;
+    cout << left << setw(30) << "insert <range|index> <index>" << setw(40) << "switch items 1 and 2, appropriately shifting the other items" << endl;
     cout << "quit" << endl;
 }
 

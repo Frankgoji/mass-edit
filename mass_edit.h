@@ -59,7 +59,8 @@ class CLIRenamer : public BaseRenamer {
         void InterpretCommands();
         void InterpretChangeDir(stringstream & line);
         void InterpretList(stringstream & line);
-        void InterpretSwitch(stringstream & line);
+        void InterpretShift(stringstream & line);
+        void InterpretInsert(stringstream & line);
         void InterpretQuit();
         void InterpretHelp();
 };
