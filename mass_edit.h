@@ -20,7 +20,9 @@ class Range {
         Range(string s);
         static bool IsRange(string s);
         bool OutOfRange(int n);
+        bool OutOfRange(Range r);
         int Next(int n);
+        int Prev(int n);
         int Span();     // upper - lower
         int begin();
         int end();
@@ -29,6 +31,10 @@ class Range {
         int start;
         int last;
 };
+ostream & operator<< (ostream & os, Range r) {
+    os << r.begin() << "-" << r.end();
+    return os;
+}
 
 class BaseRenamer {
     public:
@@ -62,7 +68,7 @@ class CLIRenamer : public BaseRenamer {
         void InterpretShift(stringstream & line);
         void InterpretInsert(stringstream & line);
         void InterpretQuit();
-        void InterpretHelp();
+        void InterpretHelp(string errmessage);
 };
 
 class GUIRenamer : public BaseRenamer {

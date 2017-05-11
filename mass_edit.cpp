@@ -28,17 +28,27 @@ bool Range::OutOfRange(int n) {
     return (start < last && (n >= last || n < start))
         || (start > last && (n <= last || n > start));
 }
+/* Returns true if r is not entirely within the range */
+bool Range::OutOfRange(Range r) {
+    return (OutOfRange(r.begin()) || OutOfRange(r.Prev(r.end())));
+}
 int Range::Next(int n) {
     if (start <= last) {
         return n+1;
     }
     return n-1;
 }
+int Range::Prev(int n) {
+    if (start <= last) {
+        return n-1;
+    }
+    return n+1;
+}
 int Range::Span() {
     return abs(last - start);
 }
 Range Range::reverse() {
-    return Range(last-1, start-1);
+    return Range(Prev(last), Prev(start));
 }
 
 /* BaseRenamer: Constructor */
@@ -107,8 +117,8 @@ void BaseRenamer::insert(Range origpositions, int newpos) {
     }
     int offset;
     if (origpositions.end() <= newpos) {
-        offset = newpos - origpositions.end() + 1;
-        for (int i = origpositions.end(); i <= newpos; i++) {
+        offset = newpos - origpositions.end();
+        for (int i = origpositions.end(); i < newpos; i++) {
             // Rename files[i+span] to files[i]
             dir_rename(files[i], files[i-origpositions.Span()]);
         }
@@ -134,18 +144,19 @@ void BaseRenamer::shiftnames(Range fileRange, int add) {
         stringstream strm(files[i]);
         size_t suffixstart = files[i].find_last_of(".");
         if (strm >> fileNum) {
-            strm.clear();
+            stringstream newFile("");
             fileNum += add;
-            strm << fileNum;
+            newFile << fileNum;
             string suffix = "";
             if (suffixstart != string::npos) {
+                cout << "adding suffix?" << endl;
                 suffix = files[i].substr(suffixstart);
-                strm << suffix;
+                newFile << suffix;
             }
-            if (strm.str().length() > longestName) {
-                longestName = strm.str().length();
+            if (newFile.str().length() > longestName) {
+                longestName = newFile.str().length();
             }
-            dir_rename(files[i], strm.str());
+            dir_rename(files[i], newFile.str());
         } else {
             cerr << "File doesn't start with number." << endl;
             break;
@@ -174,12 +185,14 @@ void CLIRenamer::InterpretCommands() {
                 InterpretChangeDir(linestrm);
             } else if (first == "ls") {
                 InterpretList(linestrm);
-            } else if (first == "switch") {
+            } else if (first == "shift") {
+                InterpretShift(linestrm);
+            } else if (first == "insert") {
                 InterpretInsert(linestrm);
             } else if (first == "quit") {
                 InterpretQuit();
             } else {
-                InterpretHelp();
+                InterpretHelp("");
             }
         }
     }
@@ -211,15 +224,78 @@ void CLIRenamer::InterpretList(stringstream & line) {
 }
 
 /* Interpret the shift command */
-void InterpretShift(stringstream & line) {
-    //
+void CLIRenamer::InterpretShift(stringstream & line) {
+    string firstarg;
+    int amt;
+    if (!(line >> firstarg)) {
+        InterpretHelp("shift command needs at least one argument");
+        return;
+    }
+    Range * r;
+    if (firstarg == "all") {    // shift all files
+        r = new Range(0, files.size());
+    } else if (Range::IsRange(firstarg)) {  // read range
+        r = new Range(firstarg);
+    } else {
+        stringstream first(firstarg);   // Check if it's a number
+        if (!(first >> amt)) {
+            InterpretHelp("incorrect shift usage");
+            return;
+        }
+        r = new Range(0, files.size()); // If so, shift all
+    }
+    // Get amount to shift by
+    if ((firstarg == "all" || Range::IsRange(firstarg)) && !(line >> amt)) {
+        InterpretHelp("");
+        return;
+    }
+    // perform error checking on the input
+    Range filesIndex(0, files.size());
+    if (filesIndex.OutOfRange(*r)) {
+        InterpretHelp("Files are out of range\n");
+    } else if ((r->begin() != 0 || r->end() != filesIndex.end())
+            && r->begin() + amt < filesIndex.end()) {  // not shifting all, but causes a conflict
+        InterpretHelp("File collision illegal\n");
+    } else {
+        shiftnames(*r, amt);
+    }
 }
 
 /* Interpret the insert command */
 void CLIRenamer::InterpretInsert(stringstream & line) {
-    int old, n;
-    line >> old >> n;
-    //insert(old, n);
+    string first;
+    int index2;
+    if (!(line >> first)) { // Check the first arg
+        InterpretHelp("insert command needs at least two arguments");
+        return;
+    }
+    Range * r;
+    if (Range::IsRange(first)) {    // first arg is range
+        r = new Range(first);
+    } else {                        // first arg is index
+        int index1;
+        stringstream firststr(first);
+        if (!(firststr >> index1)) {
+            InterpretHelp("incorrect insert usage");
+            return;
+        }
+        r = new Range(index1, index1 + 1);
+    }
+    if (!(line >> index2)) {        // second arg is index
+        InterpretHelp("incorrect insert usage");
+        return;
+    }
+    // error check, call function
+    Range filesIndex(0, files.size());
+    if (filesIndex.OutOfRange(*r)) {
+        InterpretHelp("Files out of range\n");
+    } else if (filesIndex.OutOfRange(index2) && index2 != filesIndex.end()) {
+        InterpretHelp("Insert point out of range\n");
+    } else if (!r->OutOfRange(index2)) {
+        InterpretHelp("Cannot insert file into the same range\n");
+    } else {
+        insert(*r, index2);
+    }
 }
 
 /* Quit */
@@ -228,7 +304,10 @@ void CLIRenamer::InterpretQuit() {
 }
 
 /* Usage */
-void CLIRenamer::InterpretHelp() {
+void CLIRenamer::InterpretHelp(string errmessage) {
+    if (errmessage != "") {
+        cerr << errmessage << endl;
+    }
     cout << "Usage:" << endl;
     cout << left << setw(30) << "cd <directory>" << setw(40) << "change directory" << endl;
     cout << left << setw(30) << "ls" << setw(40) << "list directory contents with indices" << endl;
