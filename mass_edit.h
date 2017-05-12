@@ -31,10 +31,7 @@ class Range {
         int start;
         int last;
 };
-ostream & operator<< (ostream & os, Range r) {
-    os << r.begin() << "-" << r.end();
-    return os;
-}
+ostream & operator<< (ostream & os, Range r);
 
 class BaseRenamer {
     public:
