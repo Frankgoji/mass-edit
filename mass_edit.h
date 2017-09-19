@@ -67,9 +67,3 @@ class CLIRenamer : public BaseRenamer {
         void InterpretQuit();
         void InterpretHelp(string errmessage);
 };
-
-class GUIRenamer : public BaseRenamer {
-    public:
-        /* Constructor */
-        GUIRenamer();
-};
