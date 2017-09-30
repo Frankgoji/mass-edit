@@ -1,0 +1,19 @@
+.files {
+    display: block;
+    line-height: 30px;
+    height: 30px;
+    width: 150px;
+    margin: auto;
+    margin-top: 3px;
+    border-radius: 15px;
+    border: 2px solid;
+}
+.firstinrange {
+    background-color: yellow;
+}
+.secondinrange {
+    background-color: red;
+}
+.selected {
+    background-color: lightgray;
+}
