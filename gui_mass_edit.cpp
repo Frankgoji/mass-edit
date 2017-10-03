@@ -1,10 +1,10 @@
 #include <Wt/WApplication>
 #include <Wt/WBreak>
 #include <Wt/WContainerWidget>
+#include <Wt/WCssStyleSheet>
 #include <Wt/WLineEdit>
 #include <Wt/WPushButton>
 #include <Wt/WText>
-#include <Wt/WFileUpload>
 
 #include <boost/algorithm/string/join.hpp>
 
@@ -28,17 +28,17 @@ class RenameApplication : public WApplication, public BaseRenamer {
 
     private:
         WLineEdit * directory;    // directory gotten by user input
-        vector<WText *> fileContainers;
+        vector<WPushButton *> fileContainers;
         int first_index;
         Range range;
         bool a_pressed, ctrl_pressed;
         void retrieve_files();
         void display_files();
-        void set_files_style(WText * file, bool going_in, int ind);
         void set_range(int index);
         void select_all(WKeyEvent w);
         void key_up(WKeyEvent w);
         void reset_button();
+        void add_controls();
 };
 
 /* Constructor for RenameApplication. */
@@ -50,6 +50,8 @@ RenameApplication::RenameApplication(const WEnvironment& env)
     first_index = FIRST_UNSELECTED;
     a_pressed = false, ctrl_pressed = false;
     WApplication::instance()->useStyleSheet("style.css");
+    WApplication::instance()->declareJavaScriptFunction("addHover", "function() { var styleSheet = document.styleSheets[1]['cssRules'][2]['styleSheet']; for (i = 0; i < styleSheet['cssRules'].length; i++) { if (styleSheet['cssRules'][i]['selectorText'] === '.files:hover') { return; } } styleSheet.insertRule('.files:hover { background-color: var(--hover-color); }', 0);}");
+    WApplication::instance()->declareJavaScriptFunction("deleteHover", "function() {var styleSheet = document.styleSheets[1]['cssRules'][2]['styleSheet']; for (i = 0; i < styleSheet['cssRules'].length; i++) {if (styleSheet['cssRules'][i]['selectorText'] === '.files:hover') {styleSheet.deleteRule(i); break;}}}");
     setTitle("Mass Filename Editor");
 
     root()->setContentAlignment(AlignCenter);
@@ -72,7 +74,6 @@ RenameApplication::RenameApplication(const WEnvironment& env)
     directory->enterPressed().connect(this, &RenameApplication::retrieve_files);
 }
 
-// TODO: ctrl-a select all
 /* Gets files and displays it on the page */
 void RenameApplication::retrieve_files() {
     // if bad directory, produce error text and return
@@ -80,6 +81,9 @@ void RenameApplication::retrieve_files() {
     response->clear();
     tableContainer->clear();
     controls->clear();
+    first_index = FIRST_UNSELECTED;
+    WApplication::instance()->doJavaScript(WApplication::instance()->javaScriptClass() + ".addHover()");
+    WApplication::instance()->doJavaScript("document.body.style.setProperty(\"--hover-color\", \"yellow\")");
     std::string filename(directory->text().toUTF8());
     response->addWidget(new WText("Checking directory " + filename));
 
@@ -106,46 +110,35 @@ void RenameApplication::retrieve_files() {
 
 /* Displays files on the page */
 void RenameApplication::display_files() {
+    fileContainers = vector<WPushButton *>(0);
     for (size_t i = 0; i < files.size(); i++) {
         string file(files[i]);
-        WText * fileText = new WText(file);
-        fileText->setStyleClass("files");
-        fileText->mouseWentOver().connect(std::bind(
-                &RenameApplication::set_files_style, this, fileText, true, i));
-        fileText->mouseWentOut().connect(std::bind(
-                &RenameApplication::set_files_style, this, fileText, false, i));
-        fileText->clicked().connect(std::bind(&RenameApplication::set_range,
+        WPushButton * fileButton = new WPushButton(file);
+        fileButton->setStyleClass("files");
+        fileButton->clicked().connect(std::bind(&RenameApplication::set_range,
                     this, i));
-        tableContainer->addWidget(fileText);
-        fileContainers.push_back(fileText);
-    }
-}
-
-/* Sets the style for the files buttons */
-void RenameApplication::set_files_style(WText * file, bool going_in, int ind) {
-    if (going_in && first_index == FIRST_UNSELECTED) {
-        file->addStyleClass("firstinrange");
-    } else if (ind != first_index && first_index != SELECTED) {
-        if (going_in) {
-            file->addStyleClass("secondinrange");
-        } else {
-            file->setStyleClass("files");
-        }
+        tableContainer->addWidget(fileButton);
+        fileContainers.push_back(fileButton);
     }
 }
 
 /* Resets the selected files when pressed */
 void RenameApplication::reset_button() {
-    for (WText * file : fileContainers) {
+    for (WPushButton * file : fileContainers) {
         file->setStyleClass("files");
     }
     first_index = FIRST_UNSELECTED;
+    WApplication::instance()->doJavaScript(WApplication::instance()->javaScriptClass() + ".addHover()");
+    WApplication::instance()->doJavaScript("document.body.style.setProperty(\"--hover-color\", \"yellow\")");
+    controls->clear();
 }
 
 /* Sets the range determined by the user input */
 void RenameApplication::set_range(int index) {
     if (first_index == FIRST_UNSELECTED) {
         first_index = index;
+        fileContainers[index]->setStyleClass("files firstinrange");
+        WApplication::instance()->doJavaScript("document.body.style.setProperty(\"--hover-color\", \"red\")");
         return;
     } else if (first_index == SELECTED) {
         return;
@@ -155,16 +148,20 @@ void RenameApplication::set_range(int index) {
         range = Range(index, first_index+1);
     }
     first_index = SELECTED;
+    WApplication::instance()->doJavaScript(WApplication::instance()->javaScriptClass() + ".deleteHover()");
 
-    for (int i = range.begin(); !range.OutOfRange(i); i = range.Next(i)) {
-        fileContainers[i]->setStyleClass("files selected");
+    for (size_t i = 0; i < files.size(); i++) {
+        fileContainers[i]->setStyleClass("files");
+        if (!range.OutOfRange(i)) {
+            fileContainers[i]->addStyleClass("selected");
+        }
     }
-    // TODO: add options to edit file names
+    add_controls();
 }
 
 /* Selects all for the range */
 void RenameApplication::select_all(WKeyEvent w) {
-    if (w.key() == Key_W) {
+    if (w.key() == Key_A) {
         a_pressed = true;
     }
     if (w.key() == Key_Control) {
@@ -180,6 +177,11 @@ void RenameApplication::select_all(WKeyEvent w) {
 /* Behavior for key up */
 void RenameApplication::key_up(WKeyEvent w) {
     a_pressed = false, ctrl_pressed = false;
+}
+
+// TODO: add options to edit file names
+void RenameApplication::add_controls() {
+    // implement with button and opacity
 }
 
 /*

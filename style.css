@@ -1,18 +1,24 @@
+body {
+    user-select: none;
+    --hover-color: yellow
+}
 .files {
     display: block;
-    line-height: 30px;
     height: 30px;
     width: 150px;
     margin: auto;
     margin-top: 3px;
     border-radius: 15px;
     border: 2px solid;
+    background-color: white;
+    transition-duration: 0.2s;
+}
+/* TODO: Instead of using hoverfiles, maybe turn off or delete the hover? */
+.files:hover {
+    background-color: var(--hover-color);
 }
 .firstinrange {
     background-color: yellow;
-}
-.secondinrange {
-    background-color: red;
 }
 .selected {
     background-color: lightgray;
