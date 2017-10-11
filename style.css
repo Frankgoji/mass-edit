@@ -2,6 +2,10 @@ body {
     user-select: none;
     --hover-color: yellow
 }
+.controls {
+    width: 50%;
+    align: left;
+}
 .files {
     display: block;
     height: 30px;
@@ -13,7 +17,6 @@ body {
     background-color: white;
     transition-duration: 0.2s;
 }
-/* TODO: Instead of using hoverfiles, maybe turn off or delete the hover? */
 .files:hover {
     background-color: var(--hover-color);
 }
@@ -22,4 +25,23 @@ body {
 }
 .selected {
     background-color: lightgray;
+}
+.controlbutton {
+    display: inline;
+    height: 30px;
+    width: 150px;
+    margin: auto;
+    margin-top: 5px;
+    margin-right: 5px;
+    border-radius: 5px;
+    border: 2px solid;
+    background-color: lightgreen;
+    transition-duration: 0.2s;
+}
+.controlbutton:hover {
+    box-shadow: 5px 5px 2px rgba(0,0,0,0.24), 8px 8px 4px rgba(0,0,0,0.19);
+    border: 3px solid;
+}
+.disabled {
+    opacity: 0.6;
 }

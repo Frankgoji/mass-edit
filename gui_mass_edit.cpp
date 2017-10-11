@@ -39,6 +39,7 @@ class RenameApplication : public WApplication, public BaseRenamer {
         void key_up(WKeyEvent w);
         void reset_button();
         void add_controls();
+        void select_control(WContainerWidget * selected, WContainerWidget * disabled);
 };
 
 /* Constructor for RenameApplication. */
@@ -180,8 +181,39 @@ void RenameApplication::key_up(WKeyEvent w) {
 }
 
 // TODO: add options to edit file names
+/* Add controls below the selection */
 void RenameApplication::add_controls() {
-    // implement with button and opacity
+    // TODO: implement with button and opacity
+    controls->setStyleClass("controls");
+    controls->setContentAlignment(AlignLeft);
+
+    WContainerWidget * shiftContainer = new WContainerWidget(controls);
+    WContainerWidget * insertContainer = new WContainerWidget(controls);
+
+    WPushButton * shift = new WPushButton("Shift");
+    WPushButton * insert = new WPushButton("Insert");
+    shift->setStyleClass("controlbutton");
+    insert->setStyleClass("controlbutton");
+    // TODO: shift control
+    WText * shift_text = new WText("Shift selection by a certain amount: ");
+    // TODO: insert control
+    WText * insert_text = new WText("Insert selection at this index: ");
+
+    shift->clicked().connect(std::bind(&RenameApplication::select_control, this,
+                shiftContainer, insertContainer));
+    insert->clicked().connect(std::bind(&RenameApplication::select_control,
+                this, insertContainer, shiftContainer));
+
+    shiftContainer->addWidget(shift);
+    shiftContainer->addWidget(shift_text);
+    insertContainer->addWidget(insert);
+    insertContainer->addWidget(insert_text);
+}
+
+void RenameApplication::select_control(WContainerWidget * selected,
+        WContainerWidget * disabled) {
+    selected->setStyleClass("");
+    disabled->setStyleClass("disabled");
 }
 
 /*
