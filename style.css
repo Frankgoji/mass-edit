@@ -1,6 +1,8 @@
 body {
     user-select: none;
-    --hover-color: yellow
+    --hover-color: yellow;
+    margin: 0;
+    padding: 10px;
 }
 .controls {
     width: 50%;
@@ -44,4 +46,14 @@ body {
 }
 .disabled {
     opacity: 0.6;
+}
+.disabled > :not(button), .disabled > button:last-of-type, .initial > :not(button), .initial > button:last-of-type {
+    display: none;
+}
+.rightaligned {
+    float: right;
+    margin-top: 10px;
+}
+.error {
+    background-color: pink;
 }

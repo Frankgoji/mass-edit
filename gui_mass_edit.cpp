@@ -2,11 +2,14 @@
 #include <Wt/WBreak>
 #include <Wt/WContainerWidget>
 #include <Wt/WCssStyleSheet>
+#include <Wt/WIntValidator>
 #include <Wt/WLineEdit>
 #include <Wt/WPushButton>
 #include <Wt/WText>
 
 #include <boost/algorithm/string/join.hpp>
+#include <sstream>
+#include <string>
 
 #include "mass_edit.h"
 
@@ -27,7 +30,9 @@ class RenameApplication : public WApplication, public BaseRenamer {
         WContainerWidget * controls;
 
     private:
-        WLineEdit * directory;    // directory gotten by user input
+        WLineEdit * directory;
+        WLineEdit * shift_input;
+        WLineEdit * insert_input;
         vector<WPushButton *> fileContainers;
         int first_index;
         Range range;
@@ -37,9 +42,11 @@ class RenameApplication : public WApplication, public BaseRenamer {
         void set_range(int index);
         void select_all(WKeyEvent w);
         void key_up(WKeyEvent w);
-        void reset_button();
         void add_controls();
         void select_control(WContainerWidget * selected, WContainerWidget * disabled);
+        void shift_gui(WIntValidator * intv);
+        void insert_gui(WIntValidator * intv);
+        void alert(string message);
 };
 
 /* Constructor for RenameApplication. */
@@ -99,7 +106,7 @@ void RenameApplication::retrieve_files() {
     display_files();
     tableContainer->addWidget(new WBreak());
     WPushButton * reset = new WPushButton("Reset", tableContainer);
-    reset->clicked().connect(this, &RenameApplication::reset_button);
+    reset->clicked().connect(this, &RenameApplication::retrieve_files);
 
     WApplication::globalKeyWentDown().connect(this,
             &RenameApplication::select_all);
@@ -121,17 +128,6 @@ void RenameApplication::display_files() {
         tableContainer->addWidget(fileButton);
         fileContainers.push_back(fileButton);
     }
-}
-
-/* Resets the selected files when pressed */
-void RenameApplication::reset_button() {
-    for (WPushButton * file : fileContainers) {
-        file->setStyleClass("files");
-    }
-    first_index = FIRST_UNSELECTED;
-    WApplication::instance()->doJavaScript(WApplication::instance()->javaScriptClass() + ".addHover()");
-    WApplication::instance()->doJavaScript("document.body.style.setProperty(\"--hover-color\", \"yellow\")");
-    controls->clear();
 }
 
 /* Sets the range determined by the user input */
@@ -180,24 +176,45 @@ void RenameApplication::key_up(WKeyEvent w) {
     a_pressed = false, ctrl_pressed = false;
 }
 
-// TODO: add options to edit file names
 /* Add controls below the selection */
 void RenameApplication::add_controls() {
-    // TODO: implement with button and opacity
+    controls->clear();
     controls->setStyleClass("controls");
     controls->setContentAlignment(AlignLeft);
 
     WContainerWidget * shiftContainer = new WContainerWidget(controls);
     WContainerWidget * insertContainer = new WContainerWidget(controls);
+    shiftContainer->setStyleClass("initial");
+    insertContainer->setStyleClass("initial");
 
     WPushButton * shift = new WPushButton("Shift");
     WPushButton * insert = new WPushButton("Insert");
     shift->setStyleClass("controlbutton");
     insert->setStyleClass("controlbutton");
-    // TODO: shift control
-    WText * shift_text = new WText("Shift selection by a certain amount: ");
-    // TODO: insert control
-    WText * insert_text = new WText("Insert selection at this index: ");
+
+    WText * shift_text = new WText("Shift selection by this amount: ");
+    shift_input = new WLineEdit();
+    WIntValidator * shift_int = new WIntValidator();
+    shift_int->setMandatory(true);
+    shift_input->setValidator(shift_int);
+    shift_input->setStyleClass("rightaligned");
+    WPushButton * shift_button = new WPushButton("Shift");
+    shift_button->clicked().connect(std::bind(&RenameApplication::shift_gui,
+                this, shift_int));
+    shift_button->setStyleClass("rightaligned");
+
+    stringstream insert_text_stream;
+    insert_text_stream << "Insert selection at this index (0-" << files.size() << "): ";
+    WText * insert_text = new WText(insert_text_stream.str());
+    insert_input = new WLineEdit();
+    WIntValidator * insert_int = new WIntValidator(0, files.size());
+    insert_int->setMandatory(true);
+    insert_input->setValidator(insert_int);
+    insert_input->setStyleClass("rightaligned");
+    WPushButton * insert_button = new WPushButton("Insert");
+    insert_button->clicked().connect(std::bind(&RenameApplication::insert_gui,
+                this, insert_int));
+    insert_button->setStyleClass("rightaligned");
 
     shift->clicked().connect(std::bind(&RenameApplication::select_control, this,
                 shiftContainer, insertContainer));
@@ -206,14 +223,71 @@ void RenameApplication::add_controls() {
 
     shiftContainer->addWidget(shift);
     shiftContainer->addWidget(shift_text);
+    shiftContainer->addWidget(shift_button);
+    shiftContainer->addWidget(shift_input);
     insertContainer->addWidget(insert);
     insertContainer->addWidget(insert_text);
+    insertContainer->addWidget(insert_button);
+    insertContainer->addWidget(insert_input);
 }
 
+/* Sets the other button to disabled mode */
 void RenameApplication::select_control(WContainerWidget * selected,
         WContainerWidget * disabled) {
     selected->setStyleClass("");
     disabled->setStyleClass("disabled");
+    shift_input->removeStyleClass("error");
+    insert_input->removeStyleClass("error");
+    shift_input->setText("");
+    insert_input->setText("");
+}
+
+/* Shift range by the amount inputted */
+void RenameApplication::shift_gui(WIntValidator * intv) {
+    int shift_amount;
+    stringstream text_stream;
+    text_stream << shift_input->text();
+    text_stream >> shift_amount;
+
+    Range filesIndex(0, files.size());
+    if ((range.begin() != 0 || range.end() != filesIndex.end())
+            && range.begin() + shift_amount < filesIndex.end()) {  // not shifting all, but causes a conflict
+        shift_input->addStyleClass("error");
+        alert("File collision illegal");
+    } else {
+        shiftnames(range, shift_amount);
+        alert("Done!");
+        retrieve_files();
+    }
+}
+
+/* Insert range at the index inputted */
+void RenameApplication::insert_gui(WIntValidator * intv) {
+    WValidator::Result res = intv->validate(insert_input->text());
+    if (res.message() != "") {
+        insert_input->addStyleClass("error");
+        alert("Insert point out of range");
+        return;
+    }
+    int index;
+    stringstream text_stream;
+    text_stream << insert_input->text();
+    text_stream >> index;
+    Range filesIndex(0, files.size());
+    if (!range.OutOfRange(index)) {
+        insert_input->addStyleClass("error");
+        alert("Cannot insert file into the same range");
+    } else {
+        insert(range, index);
+        alert("Done!");
+        retrieve_files();
+    }
+}
+
+void RenameApplication::alert(string message) {
+    stringstream func;
+    func << "alert(\"" << message << "\")";
+    root()->doJavaScript(func.str());
 }
 
 /*
