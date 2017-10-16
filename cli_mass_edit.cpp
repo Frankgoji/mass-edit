@@ -88,8 +88,7 @@ void CLIRenamer::InterpretShift(stringstream & line) {
     Range filesIndex(0, files.size());
     if (filesIndex.OutOfRange(*r)) {
         InterpretHelp("Files are out of range\n");
-    } else if ((r->begin() != 0 || r->end() != filesIndex.end())
-            && r->begin() + amt < filesIndex.end()) {  // not shifting all, but causes a conflict
+    } else if (!check_shift(*r, amt)) {  // check for a conflict
         InterpretHelp("File collision illegal\n");
     } else {
         shiftnames(*r, amt);

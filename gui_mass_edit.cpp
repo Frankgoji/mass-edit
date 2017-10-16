@@ -250,8 +250,7 @@ void RenameApplication::shift_gui(WIntValidator * intv) {
     text_stream >> shift_amount;
 
     Range filesIndex(0, files.size());
-    if ((range.begin() != 0 || range.end() != filesIndex.end())
-            && range.begin() + shift_amount < filesIndex.end()) {  // not shifting all, but causes a conflict
+    if (!check_shift(range, shift_amount)) {  // not shifting all, but causes a conflict
         shift_input->addStyleClass("error");
         alert("File collision illegal");
     } else {

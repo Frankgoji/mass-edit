@@ -3,6 +3,7 @@
 i=0
 while [[ $i -lt 10 ]]; do
     printf -v test "%02d" $i
-    echo $i > $test
+    echo $i > $test.txt
+    echo $i > $test.pdf
     i=$(($i+1))
 done

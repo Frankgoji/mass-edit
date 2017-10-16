@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -43,6 +44,8 @@ class BaseRenamer {
         vector<string> & listdir();
         /* Normalize filename lengths */
         void normalize(int numZeros);
+        /* Normalize this filename lengths up to numZeros */
+        string normalize(string filename, int numZeros);
         /* Filters the files by a regex pattern */
         vector<string> & filterfiles(regex pattern);
         /* Insert and shift the names in the list, simultaneously renaming the files */
@@ -52,6 +55,12 @@ class BaseRenamer {
     protected:
         /* List of files */
         vector<string> files;
+        /* Longest file name */
+        size_t longestName;
+        /* Adds amt to the file name number */
+        string addAmt(string filename, int amt);
+        /* Checks if a shift will cause any file collisions */
+        bool check_shift(Range fileRange, int shift);
 };
 
 class CLIRenamer : public BaseRenamer {
