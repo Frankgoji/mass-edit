@@ -76,6 +76,10 @@ ostream & operator<< (ostream & os, Range r) {
     return os;
 }
 
+/* Convenience utils declarations */
+static size_t numbersLen(string name);
+static size_t findSuffix(string name);
+
 /********** BaseRenamer class **********/
 /* Constructor */
 BaseRenamer::BaseRenamer()
@@ -101,14 +105,52 @@ vector<string> & BaseRenamer::listdir() {
             diritr != enditr;
             diritr++) {
         string s(diritr->path().filename().string());
-        size_t suffixstart = s.find_last_of(".");
-        if (suffixstart != string::npos && suffixstart > longestName) {
+        size_t suffixstart = findSuffix(s);
+        if (suffixstart != string::npos && suffixstart - (s.at(0) == '-') > longestName) {
             longestName = suffixstart;
         }
         files.push_back(s);
     }
-    sort(files.begin(), files.end());
+    sort(files.begin(), files.end(), compare);
     return files;
+}
+
+static int compareExtensions(string file1, string file2) {
+    size_t ext1pos(file1.find_last_of("."));
+    size_t ext2pos(file2.find_last_of("."));
+    ext1pos = (ext1pos == string::npos) ? file1.size() : ext1pos;
+    ext2pos = (ext2pos == string::npos) ? file2.size() : ext2pos;
+    string ext1(file1.substr(ext1pos));
+    string ext2(file2.substr(ext2pos));
+    return ext1.compare(ext2);
+}
+
+static int comparePrefix(string file1, string file1flag, string file2,
+        string file2flag) {
+    size_t f1pref(((file1flag == "-" && file1.at(0) == '-') ? file1.substr(1): file1).find_first_of(file1flag) + (file1.at(0) == '-'));
+    size_t f2pref(((file2flag == "-" && file1.at(0) == '-') ? file2.substr(1): file2).find_first_of(file2flag) + (file2.at(0) == '-'));
+    int comp(file1.compare(0, f1pref, file2, 0, f2pref));
+    if (file1.at(0) == '-' && file2.at(0) == '-') {
+        comp *= -1;
+    }
+    return comp;
+}
+
+/* Sorts the vector of files to comply with +/- filename specs */
+bool compare(string file1, string file2) {
+    int file1plus = count(file1.begin(), file1.end(), '+');
+    int file2plus = count(file2.begin(), file2.end(), '+');
+    int file1minus = count(file1.begin(), file1.end(), '-') - (file1.at(0) == '-');
+    int file2minus = count(file2.begin(), file2.end(), '-') - (file2.at(0) == '-');
+    string f1prefdelimiter = (file1plus > 0) ? "+" : (file1minus > 0) ? "-" : ".";
+    string f2prefdelimiter = (file2plus > 0) ? "+" : (file2minus > 0) ? "-" : ".";
+    int prefix = comparePrefix(file1, f1prefdelimiter, file2, f2prefdelimiter);
+    bool ret(false);
+    ret = (prefix < 0)
+        || (prefix == 0 && (file1plus < file2plus || file1minus > file2minus ||
+                ((file1plus == file2plus && file1minus == file2minus)
+                 && compareExtensions(file1, file2) < 0)));
+    return ret;
 }
 
 /* Normalize filename lengths up to numZeros */
@@ -122,10 +164,15 @@ void BaseRenamer::normalize(int numZeros) {
 /* Normalize this filename lengths up to numZeros */
 string BaseRenamer::normalize(string filename, int numZeros) {
     stringstream name;
-    size_t suffixstart = filename.find_last_of(".");
-    suffixstart = (suffixstart == string::npos) ? filename.length() : suffixstart;
-    name << setfill('0') << setw(numZeros) << filename.substr(0, suffixstart);
-    name << filename.substr(suffixstart);
+    string strName(filename);
+    if (strName.at(0) == '-') {
+        name << '-';
+        strName = filename.substr(1);
+    }
+    size_t suffixstart = strName.find_first_not_of("1234567890");
+    //suffixstart = (suffixstart == string::npos) ? strName.length() : suffixstart;
+    name << setfill('0') << setw(numZeros) << strName.substr(0, suffixstart);
+    name << strName.substr(suffixstart);
     return name.str();
 }
 
@@ -228,17 +275,26 @@ bool BaseRenamer::check_shift(Range fileRange, int shift) {
     return true;
 }
 
+/* Convenience utils */
+static size_t numbersLen(string name) {
+    return name.find_last_of("1234567890") - name.find_first_of("1234567890");
+}
+static size_t findSuffix(string name) {
+    return ((name.at(0) != '-') ? name : name.substr(1)).find_first_not_of("1234567890")
+        + (name.at(0) == '-');
+}
+
 /* Add (or subtract) the given amount from the filename */
 string BaseRenamer::addAmt(string filename, int amt) {
     int fileNum;
     stringstream strm(filename);
-    size_t suffixstart = filename.find_last_of(".");
+    size_t suffixstart = findSuffix(filename);
     if (strm >> fileNum) {
         stringstream newFile("");
         fileNum += amt;
         newFile << fileNum;
-        if (newFile.str().length() > longestName) {
-            longestName = newFile.str().length();
+        if (numbersLen(newFile.str()) > longestName) {
+            longestName = numbersLen(newFile.str());
         }
         string suffix = "";
         if (suffixstart != string::npos) {

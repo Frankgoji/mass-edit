@@ -8,12 +8,16 @@ body {
     width: 50%;
     align: left;
 }
-.files {
+.filesdiv {
     display: block;
+}
+.files {
+    display: inline-block;
     height: 30px;
     width: 150px;
-    margin: auto;
+    /*margin: auto;*/
     margin-top: 3px;
+    margin-right: 15px;
     border-radius: 15px;
     border: 2px solid;
     background-color: white;

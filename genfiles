@@ -7,3 +7,16 @@ while [[ $i -lt 10 ]]; do
     echo $i > $test.pdf
     i=$(($i+1))
 done
+
+echo 3.2 > 03+.txt
+echo 3.2 > 03+.pdf
+echo 5.5 > 05+.txt
+echo 5.5 > 05+.pdf
+echo 5.75 > 05++.txt
+echo 5.75 > 05++.pdf
+echo 5.8 > 06-.txt
+echo 5.8 > 06-.pdf
+echo 8.6 > 09--.txt
+echo 8.6 > 09--.pdf
+echo 8.8 > 09-.txt
+echo 8.8 > 09-.pdf

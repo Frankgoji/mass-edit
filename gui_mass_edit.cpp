@@ -39,13 +39,15 @@ class RenameApplication : public WApplication, public BaseRenamer {
         bool a_pressed, ctrl_pressed;
         void retrieve_files();
         void display_files();
+        void parse();
+        void increment(int i, bool isPlus);
         void set_range(int index);
         void select_all(WKeyEvent w);
         void key_up(WKeyEvent w);
         void add_controls();
         void select_control(WContainerWidget * selected, WContainerWidget * disabled);
-        void shift_gui(WIntValidator * intv);
-        void insert_gui(WIntValidator * intv);
+        void shift_gui(WLineEdit * input);
+        void insert_gui(WLineEdit * input, WIntValidator * intv);
         void alert(string message);
 };
 
@@ -119,15 +121,144 @@ void RenameApplication::retrieve_files() {
 /* Displays files on the page */
 void RenameApplication::display_files() {
     fileContainers = vector<WPushButton *>(0);
+    bool incFound(false);
     for (size_t i = 0; i < files.size(); i++) {
         string file(files[i]);
+        if (file.find("+.") != string::npos
+                || file.find("-.") != string::npos) {
+            incFound = true;
+        }
         WPushButton * fileButton = new WPushButton(file);
+        WContainerWidget * fileDiv = new WContainerWidget(tableContainer);
+        fileDiv->setStyleClass("filesdiv");
         fileButton->setStyleClass("files");
         fileButton->clicked().connect(std::bind(&RenameApplication::set_range,
                     this, i));
-        tableContainer->addWidget(fileButton);
+        fileDiv->addWidget(fileButton);
         fileContainers.push_back(fileButton);
     }
+    if (incFound) {
+        WContainerWidget * incContainer = new WContainerWidget();
+        WPushButton * parse = new WPushButton("Parse");
+        tableContainer->insertWidget(0, incContainer);
+        incContainer->addWidget(new WText("We found files with + or - flags. Would you like to parse and increment/decrement? "));
+        incContainer->addWidget(parse);
+        parse->clicked().connect(this, &RenameApplication::parse);
+    }
+}
+
+// Convenience utilities
+enum status {PLUS, MINUS, NEITHER};
+typedef struct {
+    int start;
+    int end;
+    status flag;
+    string prefix;
+    int flagCount;
+} groupStats;
+typedef struct {
+    string name;
+    status flag;
+    string prefix;
+    int flagCount;
+} fileStats;
+static string getPrefix(string name) {
+    stringstream res;
+    string str(name);
+    if (name.at(0) == '-') {
+        res << "-";
+        str = str.substr(1);
+    }
+    res << str.substr(0, str.find_first_not_of("1234567890"));
+    return res.str();
+}
+static fileStats fileStat(string file) {
+    status fileFlag(NEITHER);
+    if (file.find("+.") != string::npos) {
+        fileFlag = PLUS;
+    } else if (file.find("-.") != string::npos) {
+        fileFlag = MINUS;
+    }
+    string filePrefix(getPrefix(file));
+    int fileFlagCount((fileFlag == NEITHER) ? 0 : count(file.begin(), file.end(), (fileFlag == PLUS) ? '+' : '-'));
+    fileStats stats{file, fileFlag, filePrefix, fileFlagCount};
+    return stats;
+}
+static void printGroupStats(groupStats g) {
+    char flag((g.flag == NEITHER) ? ' ' : (g.flag == PLUS) ? '+' : '-');
+    string flags(g.flagCount, flag);
+}
+
+/* Parses the files to increment or decrement them appropriately. */
+void RenameApplication::parse() {
+    size_t i(0);
+    groupStats group{-1, -1, NEITHER, "", 0};
+    printGroupStats(group);
+    while (i < files.size()) {
+        fileStats f(fileStat(files[i]));
+
+        // Change state
+        if (group.flag != f.flag
+                || group.prefix != f.prefix
+                || group.flagCount != f.flagCount) {
+            group.flag = f.flag;
+            group.prefix = f.prefix;
+            group.flagCount = f.flagCount;
+            if (f.flag == NEITHER) {
+                group.end = (group.start = -1);
+            } else {
+                group.end = (group.start = i) + 1;
+            }
+        } else if (group.flag != NEITHER) {
+            group.end++;
+        }
+        printGroupStats(group);
+
+        // If need to increment/decrement group, do it
+        if (group.flag != NEITHER) {
+            // Check if next file in same group
+            fileStats fNext;
+            if (i < files.size() - 1) {
+                fNext = fileStat(files[i+1]);
+            }
+            bool nextNotInGroup(fNext.flag != group.flag
+                    || fNext.prefix != group.prefix
+                    || fNext.flagCount != group.flagCount);
+            if (i == files.size() - 1 || nextNotInGroup) {
+                bool isPlus(group.flag == PLUS);
+                if (isPlus) {
+                    increment(group.start, isPlus);
+                } else {
+                    increment(group.end - 1, isPlus);
+                }
+                for (int i = group.start; i < group.end; i++) {
+                    // remove flags before incrementing; assume that the flags
+                    // are contiguous and single period in name
+                    string sansFlags(files[i].substr(0, files[i].find_last_of("1234567890") + 1)
+                            + files[i].substr(files[i].find_last_of(".")));
+                    dir_rename(files[i], sansFlags);
+                }
+                listdir();
+            }
+        }
+        i++;
+    }
+    retrieve_files();
+}
+
+/* Performs the appropriate increment/decrement action: if increment, shift this
+ * file and all subsequent files up. If decrement, shift this file and all prior
+ * files down. */
+void RenameApplication::increment(int i, bool isPlus) {
+    first_index = FIRST_UNSELECTED;
+    int second_index(files.size() - 1);
+    if (!isPlus) {
+        second_index = 0;
+    }
+    set_range(i);
+    set_range(second_index);
+    WLineEdit * shift = new WLineEdit(isPlus ? "1" : "-1");
+    shift_gui(shift);
 }
 
 /* Sets the range determined by the user input */
@@ -200,7 +331,7 @@ void RenameApplication::add_controls() {
     shift_input->setStyleClass("rightaligned");
     WPushButton * shift_button = new WPushButton("Shift");
     shift_button->clicked().connect(std::bind(&RenameApplication::shift_gui,
-                this, shift_int));
+                this, shift_input));
     shift_button->setStyleClass("rightaligned");
 
     stringstream insert_text_stream;
@@ -213,7 +344,7 @@ void RenameApplication::add_controls() {
     insert_input->setStyleClass("rightaligned");
     WPushButton * insert_button = new WPushButton("Insert");
     insert_button->clicked().connect(std::bind(&RenameApplication::insert_gui,
-                this, insert_int));
+                this, insert_input, insert_int));
     insert_button->setStyleClass("rightaligned");
 
     shift->clicked().connect(std::bind(&RenameApplication::select_control, this,
@@ -243,15 +374,15 @@ void RenameApplication::select_control(WContainerWidget * selected,
 }
 
 /* Shift range by the amount inputted */
-void RenameApplication::shift_gui(WIntValidator * intv) {
+void RenameApplication::shift_gui(WLineEdit * shift_in) {
     int shift_amount;
     stringstream text_stream;
-    text_stream << shift_input->text();
+    text_stream << shift_in->text();
     text_stream >> shift_amount;
 
     Range filesIndex(0, files.size());
     if (!check_shift(range, shift_amount)) {  // not shifting all, but causes a conflict
-        shift_input->addStyleClass("error");
+        shift_in->addStyleClass("error");
         alert("File collision illegal");
     } else {
         shiftnames(range, shift_amount);
@@ -261,20 +392,21 @@ void RenameApplication::shift_gui(WIntValidator * intv) {
 }
 
 /* Insert range at the index inputted */
-void RenameApplication::insert_gui(WIntValidator * intv) {
-    WValidator::Result res = intv->validate(insert_input->text());
+void RenameApplication::insert_gui(WLineEdit * insert_in,
+        WIntValidator * intv) {
+    WValidator::Result res = intv->validate(insert_in->text());
     if (res.message() != "") {
-        insert_input->addStyleClass("error");
+        insert_in->addStyleClass("error");
         alert("Insert point out of range");
         return;
     }
     int index;
     stringstream text_stream;
-    text_stream << insert_input->text();
+    text_stream << insert_in->text();
     text_stream >> index;
     Range filesIndex(0, files.size());
     if (!range.OutOfRange(index)) {
-        insert_input->addStyleClass("error");
+        insert_in->addStyleClass("error");
         alert("Cannot insert file into the same range");
     } else {
         insert(range, index);

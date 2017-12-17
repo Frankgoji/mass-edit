@@ -62,6 +62,8 @@ class BaseRenamer {
         /* Checks if a shift will cause any file collisions */
         bool check_shift(Range fileRange, int shift);
 };
+/* Sorts the vector of files to comply with +/- filename specs */
+bool compare(string file1, string file2);
 
 class CLIRenamer : public BaseRenamer {
     public:
