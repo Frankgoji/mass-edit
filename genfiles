@@ -14,9 +14,9 @@ echo 5.5 > 05+.txt
 echo 5.5 > 05+.pdf
 echo 5.75 > 05++.txt
 echo 5.75 > 05++.pdf
-echo 5.8 > 06-.txt
-echo 5.8 > 06-.pdf
-echo 8.6 > 09--.txt
-echo 8.6 > 09--.pdf
-echo 8.8 > 09-.txt
-echo 8.8 > 09-.pdf
+echo 5.8 > 6-.txt
+echo 5.8 > 6-.pdf
+echo 8.6 > 9--.txt
+echo 8.6 > 9--.pdf
+echo 8.8 > 9-.txt
+echo 8.8 > 9-.pdf

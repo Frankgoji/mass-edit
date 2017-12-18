@@ -57,6 +57,8 @@ class BaseRenamer {
         vector<string> files;
         /* Longest file name */
         size_t longestName;
+        /* If necessary to normalize files */
+        bool needNormalize;
         /* Adds amt to the file name number */
         string addAmt(string filename, int amt);
         /* Checks if a shift will cause any file collisions */

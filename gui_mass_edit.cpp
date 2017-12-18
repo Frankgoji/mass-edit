@@ -39,6 +39,7 @@ class RenameApplication : public WApplication, public BaseRenamer {
         bool a_pressed, ctrl_pressed;
         void retrieve_files();
         void display_files();
+        void normalizeOp();
         void parse();
         void increment(int i, bool isPlus);
         void set_range(int index);
@@ -137,14 +138,29 @@ void RenameApplication::display_files() {
         fileDiv->addWidget(fileButton);
         fileContainers.push_back(fileButton);
     }
+    int top(0);
+    if (needNormalize) {
+        WContainerWidget * normContainer = new WContainerWidget();
+        WPushButton * norm = new WPushButton("Normalize");
+        tableContainer->insertWidget(top, normContainer);
+        normContainer->addWidget(new WText("We found files that don't have the same file length. Would you like to normalize? "));
+        normContainer->addWidget(norm);
+        norm->clicked().connect(this, &RenameApplication::normalizeOp);
+        top++;
+    }
     if (incFound) {
         WContainerWidget * incContainer = new WContainerWidget();
         WPushButton * parse = new WPushButton("Parse");
-        tableContainer->insertWidget(0, incContainer);
+        tableContainer->insertWidget(top, incContainer);
         incContainer->addWidget(new WText("We found files with + or - flags. Would you like to parse and increment/decrement? "));
         incContainer->addWidget(parse);
         parse->clicked().connect(this, &RenameApplication::parse);
     }
+}
+
+void RenameApplication::normalizeOp() {
+    normalize(longestName);
+    retrieve_files();
 }
 
 // Convenience utilities

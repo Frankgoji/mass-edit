@@ -84,7 +84,8 @@ static size_t findSuffix(string name);
 /* Constructor */
 BaseRenamer::BaseRenamer()
     : files(0),
-      longestName(0)
+      longestName(0),
+      needNormalize(false)
 {
     listdir();
 }
@@ -97,6 +98,7 @@ void BaseRenamer::dir_rename(string old, string n) {
 /* Lists the items in the directory */
 vector<string> & BaseRenamer::listdir() {
     longestName = 0;
+    int firstLongest(0);
     if (files.size() != 0) {
         files = vector<string>(0);
     }
@@ -107,6 +109,11 @@ vector<string> & BaseRenamer::listdir() {
         string s(diritr->path().filename().string());
         size_t suffixstart = findSuffix(s);
         if (suffixstart != string::npos && suffixstart - (s.at(0) == '-') > longestName) {
+            if (firstLongest == 0) {
+                firstLongest = suffixstart;
+            } else {
+                needNormalize = true;
+            }
             longestName = suffixstart;
         }
         files.push_back(s);
@@ -159,6 +166,7 @@ void BaseRenamer::normalize(int numZeros) {
         dir_rename(files[i], normalize(files[i], numZeros));
     }
     listdir();
+    needNormalize = false;
 }
 
 /* Normalize this filename lengths up to numZeros */
